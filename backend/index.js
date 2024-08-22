@@ -83,7 +83,7 @@ let books = [
 
 const typeDefs = `
   type Book {
-    title: String!
+    title: String
     author: String!
     published: Int!
     genres: [String!]!
@@ -97,7 +97,7 @@ const typeDefs = `
   type Query {
     bookCount: Int!
     authorCount: Int!
-    allBooks: [Book!]!
+    allBooks(author: String): [Book!]
     allAuthors: [Author!]!
   }
 `
@@ -106,18 +106,25 @@ const resolvers = {
   Query: {
     bookCount: () => books.length,
     authorCount: () => authors.length,
-    allBooks: () => books,
+    allBooks: (root, args) => getBooks(root, args),
     allAuthors: () => authors,
   },
   Author: {
     bookCount: ({ name }) => countAuthorsBooks(name)
-  }
+  },
 }
 
 function countAuthorsBooks(name) {
-    let count = 0;
-    books.forEach(book => book.author == name ? count++ : 0);
-    return count;
+  let count = 0;
+  books.forEach(book => book.author == name ? count++ : 0);
+  return count;
+}
+
+function getBooks(root, args) {
+  if (Object.keys(args).length === 0) {
+    return books
+  }
+  return books.filter(book => book.author == args.author)
 }
 
 const server = new ApolloServer({
