@@ -83,7 +83,7 @@ let books = [
 
 const typeDefs = `
   type Book {
-    title: String
+    title: String!
     author: String!
     published: Int!
     genres: [String!]!
@@ -97,7 +97,7 @@ const typeDefs = `
   type Query {
     bookCount: Int!
     authorCount: Int!
-    allBooks(author: String): [Book!]
+    allBooks(author: String, genre: String): [Book!]!
     allAuthors: [Author!]!
   }
 `
@@ -121,10 +121,18 @@ function countAuthorsBooks(name) {
 }
 
 function getBooks(root, args) {
-  if (Object.keys(args).length === 0) {
+  if (args.genre != undefined && args.author != undefined) {
     return books
+      .filter(book => book.author == args.author)
+      .filter(book => book.genres.includes(args.genre))
   }
-  return books.filter(book => book.author == args.author)
+  else if (args.genre != undefined) {
+    return books.filter(book => book.genres.includes(args.genre))
+  }
+  else if (args.author != undefined) {
+    return books.filter(book => book.author == args.author)
+  }
+  return books
 }
 
 const server = new ApolloServer({
