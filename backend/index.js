@@ -113,6 +113,10 @@ const typeDefs = `
     addAuthor(
       name: String
     ): Author
+    editAuthor(
+      name: String
+      setBornTo: Int
+    ): Author
   }
 `
 
@@ -128,20 +132,23 @@ const resolvers = {
   },
   Mutation: {
     addBook: (root, args) => addNewBook(root, args),
-    addAuthor: (root, args) => addNewAuthor(root, args)
+    addAuthor: (root, args) => addNewAuthor(root, args),
+    editAuthor: (root, args) => editAuthorData(root, args),
   }
 }
 
-function addNewBook(root, args) {
-  console.log("args: ", args)
-  console.log("authors: ", authors)
-  //console.log("authors.find: ", authors.find(author => author.name == args.author))
-  if (!authors.find(author => author.name == args.author)) {
-    console.log("authoria ei löytynyt")
-    addNewAuthor(root, args)
+function editAuthorData(root, args) {
+  const authorFound = authors.find(author => author.name == args.name)
+  if (authorFound) {
+    authorFound.born = args.setBornTo
+    return authorFound
   }
-  else {
-    console.log("author löytyi")
+  return null
+}
+
+function addNewBook(root, args) {
+  if (!authors.find(author => author.name == args.author)) {
+    addNewAuthor(root, args)
   }
   const book = { ...args, id: uuid() }
   books = books.concat(book)
@@ -149,15 +156,12 @@ function addNewBook(root, args) {
 }
 
 function addNewAuthor(root, args) {
-  console.log("addNewAuthor args: ", args)
   const author = {
     name: args.author,
     id: uuid(),
     born: args.born ? args.born : null,
   }
   authors = authors.concat(author)
-  console.log("valmis author: ", author)
-  console.log("authors lisäyksen jälkeen: ", authors)
   return author
 }
 
