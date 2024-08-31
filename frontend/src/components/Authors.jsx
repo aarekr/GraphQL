@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 const Authors = (props) => {
     const [ name, setName ] = useState('')
-    const [ born, setYear ] = useState()
+    const [ born, setYear ] = useState('')
     
     const [ editAuthor ] = useMutation(EDIT_AUTHOR_YEAR)
 
@@ -54,7 +54,9 @@ const Authors = (props) => {
             <form onSubmit={submit}>
                 <div>
                     Name:
-                    <input value={name} onChange={({ target }) => setName(target.value)} />
+                    <select onChange={({ target }) => setName(target.value)}>
+                        {result.data.allAuthors.map(a => <option key={a.name}>{a.name}</option>)}
+                    </select>
                 </div>
                 <div>
                     Born:
