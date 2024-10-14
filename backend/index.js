@@ -1,8 +1,28 @@
 const { ApolloServer } = require('@apollo/server')
 const { startStandaloneServer } = require('@apollo/server/standalone')
 const { v1: uuid } = require('uuid')
+const { GraphQLError } = require('graphql')
 
-let authors = [
+const mongoose = require('mongoose')
+mongoose.set('strictQuery', false)
+const Author = require('./models/author')
+const Book = require('./models/book')
+
+require('dotenv').config()
+
+const url = process.env.MONGODB_URI
+
+console.log('connecting to', url)
+
+mongoose.connect(url)
+  .then(() => {
+    console.log('connected to MongoDB')
+  })
+  .catch((error) => {
+    console.log('error connection to MongoDB:', error.message)
+  })
+
+/*let authors = [
   {
     name: 'Robert Martin',
     id: "afa51ab0-344d-11e9-a414-719c6709cf3e",
@@ -26,11 +46,11 @@ let authors = [
     name: 'Sandi Metz', // birthyear not known
     id: "afa5b6f3-344d-11e9-a414-719c6709cf3e",
   },
-]
+]*/
 
 // Yksinkertaisuuden vuoksi tallennamme kuitenkin kirjan yhteyteen tekijän nimen
 
-let books = [
+/*let books = [
   {
     title: 'Clean Code',
     published: 2008,
@@ -80,19 +100,29 @@ let books = [
     id: "afa5de04-344d-11e9-a414-719c6709cf3e",
     genres: ['classic', 'revolution']
   },
-]
+]*/
 
-const typeDefs = `
+/* alkuperäinen
   type Book {
     title: String!
     author: String!
     published: Int!
     genres: [String!]!
   }
+*/
+
+const typeDefs = `
+  type Book {
+    title: String!
+    published: Int!
+    author: Author!
+    genres: [String!]!
+    id: ID!
+  }
 
   type Author {
     name: String!
-    bookCount: Int!
+    bookCount: Int
     born: Int
   }
 
@@ -122,17 +152,51 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
-    bookCount: () => books.length,
-    authorCount: () => authors.length,
-    allBooks: (root, args) => getBooks(root, args),
-    allAuthors: () => authors,
+    //bookCount: () => books.length,
+    bookCount: async () => Book.collection.countDocuments(),
+    //authorCount: () => authors.length,
+    authorCount: async () => Author.collection.countDocuments(),
+    //allBooks: (root, args) => getBooks(root, args),
+    allBooks: async (root, args) => Book.find({}),
+    //allAuthors: () => authors,
+    allAuthors: async () => Author.find({}),
   },
   Author: {
     bookCount: ({ name }) => countAuthorsBooks(name)
   },
   Mutation: {
-    addBook: (root, args) => addNewBook(root, args),
-    addAuthor: (root, args) => addNewAuthor(root, args),
+    //addBook: (root, args) => addNewBook(root, args),
+    addBook: async (root, args) => {
+      const book = new Book({ ...args })
+      console.log("Backend index.js addBook book:", book)
+      try {
+        await book.save()
+      } catch (error) {
+        throw new GraphQLError('Saving book failed', {
+          extensions: {
+            code: 'BAD_USER_INPUT',
+            invalidArgs: args.name,
+            error
+          }
+        })
+      }
+    },
+    //addAuthor: (root, args) => addNewAuthor(root, args),
+    addAuthor: async (root, args) => {
+      const author = new Author({ ...args })
+      console.log("Backend index.js addAuthor author:", author)
+      try {
+        await author.save()
+      } catch (error) {
+        throw new GraphQLError('Saving author failed', {
+          extensions: {
+            code: 'BAD_USER_INPUT',
+            invalidArgs: args.name,
+            error
+          }
+        })
+      }
+    },
     editAuthor: (root, args) => editAuthorData(root, args),
   }
 }
@@ -150,7 +214,8 @@ function addNewBook(root, args) {
   if (!authors.find(author => author.name == args.author)) {
     addNewAuthor(root, args)
   }
-  const book = { ...args, id: uuid() }
+  //const book = { ...args, id: uuid() }
+  const book = { ...args }
   books = books.concat(book)
   return book
 }
