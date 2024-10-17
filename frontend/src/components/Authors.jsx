@@ -28,6 +28,8 @@ const Authors = (props) => {
         return <div>loading...</div>
     }
 
+    console.log('Authors result:', result)
+
     return(
         <div>
             <h2>Authors</h2>

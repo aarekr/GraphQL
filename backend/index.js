@@ -86,16 +86,18 @@ const resolvers = {
     bookCount: async () => Book.collection.countDocuments(),
     authorCount: async () => Author.collection.countDocuments(),
     allBooks: async (root, args) => {
-      console.log('allBooks args:', args)
+      //console.log('allBooks args:', args)
       if (args.title) {
         const result = await Book.find({ title: args.title })
         return result
       }
-      const result = await Book.find({})
+      //const result = await Book.find({})
+      const result = await getBooks(root, args)
+      //console.log('allBooks result:', result)
       return result
     },
     allAuthors: async (root, args) => {
-      console.log('allAuthors args:', args)
+      //console.log('allAuthors args:', args)
       if (args.name) {
         const result = await Author.find({ name: args.name })
         return result
@@ -139,7 +141,6 @@ const resolvers = {
       const author = new Author({ ...args })
       console.log("Backend index.js addAuthor author:", author)
       const currentUser = context.currentUser
-      console.log('addBook context & currentUser:', context, "-", currentUser)
       if (!currentUser) {
         throw new GraphQLError('not authenticated', {
           extensions: {
@@ -238,13 +239,46 @@ function addNewAuthor(root, args) {
   return author
 }
 
-function countAuthorsBooks(name) {
+async function countAuthorsBooks(name) {
   let count = 0;
-  books.forEach(book => book.author == name ? count++ : 0);
+  const authors = await Author.find({})
+  let searchedAuthor;
+  for (let i=0; i<authors.length; i++) {
+    if (authors[i]['name'] == name) {
+      searchedAuthor = authors[i]
+    }
+  }
+  //books.forEach(book => book.author == name ? count++ : 0);
+  const books = await Book.find({})
+  for (let i=0; i<books.length; i++) {
+    if (books[i]['author'].toString() == searchedAuthor['_id'].toString()) {
+      count++
+    }
+  }
   return count;
 }
 
-function getBooks(root, args) {
+async function getBooks(root, args) {
+  //console.log('getBooks args:', args)
+  const books = await Book.find({})
+  const authors = await Author.find({})
+  let booksModified = []
+  for (let i=0; i<books.length; i++) {
+    for (let j=0; j<authors.length; j++) {
+      if (books[i]['author'].toString() == authors[j]['_id'].toString()) {
+        let newBookObject = {
+          '_id': books[i]['_id'],
+          'title': books[i]['title'],
+          'published': books[i]['published'],
+          'author': authors[j],
+          'genres': books[i]['genres'],
+          '__v': books[i]['__v'],
+        }
+        booksModified.push(newBookObject)
+      }
+    }
+  }
+  return booksModified
   if (args.genre != undefined && args.author != undefined) {
     return books
       .filter(book => book.author == args.author)
