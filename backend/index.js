@@ -26,15 +26,15 @@ mongoose.connect(url)
 
 const typeDefs = `
   type Book {
-    title: String!
-    published: Int!
-    author: Author!
-    genres: [String!]!
+    title: String
+    published: Int
+    author: Author
+    genres: [String]
     id: ID!
   }
 
   type Author {
-    name: String!
+    name: String
     bookCount: Int
     born: Int
   }
@@ -114,8 +114,7 @@ const resolvers = {
   },
   Mutation: {
     addBook: async (root, args, context) => {
-      const book = new Book({ ...args })
-      console.log("Backend index.js addBook book:", book)
+      let book = new Book({ ...args })
       const currentUser = context.currentUser
       if (!currentUser) {
         throw new GraphQLError('not authenticated', {
@@ -124,6 +123,14 @@ const resolvers = {
           }
         })
       }
+      const authorObject = await getAutorID(args.author)
+      if (authorObject.length == 0) {
+        const newAuthorObject = await addNewAuthor(root, args, context)
+        book['author'] = newAuthorObject['_id'].toString()
+      } else if (authorObject.length > 0) {
+        book['author'] = authorObject[0]['_id'].toString()
+      }
+      console.log('valmis book: ', book)
       try {
         await book.save()
       } catch (error) {
@@ -211,7 +218,7 @@ const resolvers = {
         username: user.username,
         id: user._id,
       }
-      console.log('userToken: ', userForToken)
+      //console.log('userToken: ', userForToken)
       return { value: jwt.sign(userForToken, process.env.JWT_SECRET) }
     },
   }
@@ -219,7 +226,7 @@ const resolvers = {
 
 /********************** helper functions **********************/
 
-function addNewBook(root, args) {
+/*function addNewBook(root, args) {
   if (!authors.find(author => author.name == args.author)) {
     addNewAuthor(root, args)
   }
@@ -227,15 +234,16 @@ function addNewBook(root, args) {
   const book = { ...args }
   books = books.concat(book)
   return book
-}
+}*/
 
-function addNewAuthor(root, args) {
-  const author = {
+async function addNewAuthor(root, args, context) {
+  console.log('addNewAuthor args:', args)
+  const author = new Author({
     name: args.author,
-    id: uuid(),
     born: args.born ? args.born : null,
-  }
-  authors = authors.concat(author)
+  })
+  console.log('addNewAuthor new author:', author)
+  author.save()
   return author
 }
 
@@ -256,6 +264,18 @@ async function countAuthorsBooks(name) {
     }
   }
   return count;
+}
+
+async function getAutorID(name) {
+  console.log('getAuthorID name:', name)
+  const author = await Author.find({ name: name})
+  return author
+  /*for (let i=0; i<authors.length; i++) {
+    if (authors[i].name == name) {
+      return authors[i]['_id'].toString()
+    }
+  }*/
+  return 'author not found'
 }
 
 async function getBooks(root, args) {

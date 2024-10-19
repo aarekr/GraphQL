@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@apollo/client'
-import { CREATE_BOOK } from './queries'
+import { ALL_BOOKS, ADD_BOOK } from '../queries'
 
 const NewBook = (props) => {
   const [title, setTitle] = useState('')
@@ -9,16 +9,31 @@ const NewBook = (props) => {
   const [genre, setGenre] = useState('')
   const [genres, setGenres] = useState([])
 
-  const [createBook] = useMutation(CREATE_BOOK)
+  const [addBook] = useMutation(ADD_BOOK, {
+    onError: (error) => {
+      const messages = error.graphQLErrors.map(e => e.message).join('\n')
+      props.setError(messages)
+    },
+    update: (cache, response) => {
+      cache.updateQuery({ query: ALL_BOOKS }, ({ allBooks }) => {
+        return {
+          allBooks: allBooks.concat(response.data.addBook),
+        }
+      })
+    },
+  })
 
-  if (!props.show) {
+  /*if (!props.show) {
     return null
-  }
+  }*/
 
   const submit = async (event) => {
     event.preventDefault()
-
-    createBook({ variables: { title, author, published, genres }})
+    console.log('submit:', title, author, published, genres)
+    console.log('submit:', typeof(title), typeof(author), typeof(published), typeof(genres))
+    //let pubAsNumber = Number(published)
+    addBook({ variables: { title, author, published, genres }})
+    console.log('submit after addBook')
 
     setTitle('')
     setPublished('')
@@ -69,7 +84,7 @@ const NewBook = (props) => {
         </div>
         <div>Genres: {genres.join(' ')}</div>
         <br />
-        <button type="submit">create book</button>
+        <button type="submit">add book</button>
       </form>
     </div>
   )
