@@ -1,7 +1,9 @@
 import { useQuery } from '@apollo/client'
 import { ALL_BOOKS } from '../queries'
+import { useState } from 'react'
 
 const Books = (props) => {
+    const [ chosenGenre, setChosenGenre ] = useState('all genres')
     const result = useQuery(ALL_BOOKS, {
         pollInterval: 2000
     })
@@ -15,11 +17,16 @@ const Books = (props) => {
     }
 
     let modifiedBooks = []
-    //console.log('Books result books  :', result.data.allBooks)
+    let genres = [];
     for (let i=0; i<result.data.allBooks.length; i++) {
-        //console.log('---> ', result.data.allBooks[i])
-        //console.log('     ', result.data.allBooks[i]['title'], result.data.allBooks[i]['published'])
-        //console.log('     ', result.data.allBooks[i]['author']['name'])
+        result.data.allBooks[i].genres.map(genre => genres.includes(genre) ? null : genres.push(genre))
+        const bookHasChosenGenre = result.data.allBooks[i].genres.map(genre => genre == chosenGenre ? true : false)
+        if (chosenGenre == 'all genres') {
+            // pass
+        }
+        else if (!bookHasChosenGenre.includes(true)) {
+            continue
+        }
         let newRow = [
             result.data.allBooks[i]['title'],
             result.data.allBooks[i]['author']['name'],
@@ -29,10 +36,13 @@ const Books = (props) => {
         //setBookList(bookList.concat(newRow))
     }
     console.log('modifiedBooks:', modifiedBooks)
+    genres.push('all genres')
+    console.log('genres        :', genres)
 
     return (
         <div>
             <h2>Books</h2>
+            <p>in genre <b>{chosenGenre}</b></p>
             <table>
                 <thead>
                 <tr>
@@ -51,6 +61,13 @@ const Books = (props) => {
                 )}
                 </tbody>
             </table>
+            <br />
+            <div>
+                {genres.map(genre => 
+                    <button key={genre} onClick={() => setChosenGenre(genre)}>{genre}</button>
+                )}
+            </div>
+            <br /><hr />
         </div>
     )
 }
