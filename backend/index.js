@@ -41,6 +41,7 @@ const typeDefs = `
 
   type User {
     username: String!
+    favoritegenre: String
     id: ID!
   }
 
@@ -73,6 +74,7 @@ const typeDefs = `
 
     createUser(
       username: String!
+      favoritegenre: String
     ): User
     login(
       username: String!
@@ -193,7 +195,7 @@ const resolvers = {
       return author
     },
     createUser: async (root, args) => {
-      const user = new User({ username: args.username })
+      const user = new User({ username: args.username, favoritegenre: args.favoritegenre })
       return user.save()
         .catch(error => {
           throw new GraphQLError('Creating the user failed', {
