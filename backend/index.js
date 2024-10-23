@@ -1,6 +1,17 @@
 const { ApolloServer } = require('@apollo/server')
-const { startStandaloneServer } = require('@apollo/server/standalone')
-const { v1: uuid } = require('uuid')
+//const { startStandaloneServer } = require('@apollo/server/standalone')
+const { WebSocketServer } = require('ws')
+const { useServer } = require('graphql-ws/lib/use/ws')
+const { expressMiddleware } = require('@apollo/server/express4')
+const { ApolloServerPluginDrainHttpServer } = require('@apollo/server/plugin/drainHttpServer')
+const { makeExecutableSchema } = require('@graphql-tools/schema')
+const express = require('express')
+const cors = require('cors')
+const http = require('http')
+
+const { PubSub } = require('graphql-subscriptions')
+const pubsub = new PubSub()
+
 const { GraphQLError } = require('graphql')
 const jwt = require('jsonwebtoken')
 
@@ -9,6 +20,7 @@ mongoose.set('strictQuery', false)
 const Author = require('./models/author')
 const Book = require('./models/book')
 const User = require('./models/user')
+const { subscribe } = require('diagnostics_channel')
 
 require('dotenv').config()
 
@@ -47,6 +59,10 @@ const typeDefs = `
 
   type Token {
     value: String!
+  }
+  
+  type Subscription {
+    bookAdded: Book
   }
 
   type Query {
@@ -144,6 +160,7 @@ const resolvers = {
           }
         })
       }
+      pubsub.publish('BOOK_ADDED', { bookAdded: book })
       return book
     },
     addAuthor: async (root, args, context) => {
@@ -223,20 +240,15 @@ const resolvers = {
       //console.log('userToken: ', userForToken)
       return { value: jwt.sign(userForToken, process.env.JWT_SECRET) }
     },
-  }
+  },
+  Subscription: {
+    bookAdded: {
+      subscribe: () => pubsub.asyncIterator('BOOK_ADDED')
+    },
+  },
 }
 
 /********************** helper functions **********************/
-
-/*function addNewBook(root, args) {
-  if (!authors.find(author => author.name == args.author)) {
-    addNewAuthor(root, args)
-  }
-  //const book = { ...args, id: uuid() }
-  const book = { ...args }
-  books = books.concat(book)
-  return book
-}*/
 
 async function addNewAuthor(root, args, context) {
   console.log('addNewAuthor args:', args)
@@ -272,12 +284,6 @@ async function getAutorID(name) {
   console.log('getAuthorID name:', name)
   const author = await Author.find({ name: name})
   return author
-  /*for (let i=0; i<authors.length; i++) {
-    if (authors[i].name == name) {
-      return authors[i]['_id'].toString()
-    }
-  }*/
-  return 'author not found'
 }
 
 async function getBooks(root, args) {
@@ -301,20 +307,61 @@ async function getBooks(root, args) {
     }
   }
   return booksModified
-  if (args.genre != undefined && args.author != undefined) {
-    return books
-      .filter(book => book.author == args.author)
-      .filter(book => book.genres.includes(args.genre))
-  }
-  else if (args.genre != undefined) {
-    return books.filter(book => book.genres.includes(args.genre))
-  }
-  else if (args.author != undefined) {
-    return books.filter(book => book.author == args.author)
-  }
-  return books
 }
 
+/********************** server **********************/
+
+const start = async () => {
+  const app = express()
+  const httpServer = http.createServer(app)
+  const wsServer = new WebSocketServer({
+    server: httpServer,
+    path: '/',
+  })
+  
+  const schema = makeExecutableSchema({ typeDefs, resolvers })
+  const serverCleanup = useServer({ schema }, wsServer)
+
+  const server = new ApolloServer({
+    schema,
+    plugins: [
+      ApolloServerPluginDrainHttpServer({ httpServer }),
+      {
+        async serverWillStart() {
+          return {
+            async drainServer() {
+              await serverCleanup.dispose();
+            },
+          };
+        },
+      },
+    ],
+  })
+  await server.start()
+
+  app.use(
+    '/',
+    cors(),
+    express.json(),
+    expressMiddleware(server, {
+      context: async ({ req }) => {
+        const auth = req ? req.headers.authorization : null
+        if (auth && auth.startsWith('Bearer ')) {
+          const decodedToken = jwt.verify(auth.substring(7), process.env.JWT_SECRET)
+          const currentUser = await User.findById(decodedToken.id)
+          return { currentUser }
+        }
+      },
+    }),
+  )
+  const PORT = 4000
+  httpServer.listen(PORT, () =>
+    console.log(`Server is now running on http://localhost:${PORT}`)
+  )
+}
+start()
+
+/*
 const server = new ApolloServer({
   typeDefs,
   resolvers,
@@ -336,3 +383,4 @@ startStandaloneServer(server, {
 }).then(({ url }) => {
   console.log(`Server ready at ${url}`)
 })
+*/
